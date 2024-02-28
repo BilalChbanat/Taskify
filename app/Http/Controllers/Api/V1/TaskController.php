@@ -12,72 +12,91 @@ use Illuminate\Support\Facades\Validator;
 class TaskController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * @OA\Get(
+     *     path="/api/v1/tasks",
+     *     summary="Get all tasks",
+     *     @OA\Response(response=200, description="Successful operation"),
+     *     @OA\Response(response=404, description="No tasks found")
+     * )
      */
     public function index()
     {
         $tasks = Task::all();
 
-        if (count($tasks) > 0){
-
+        if (count($tasks) > 0) {
             return response()->json([
-            'status' => '200',
-            'tasks' => $tasks
+                'status' => '200',
+                'tasks' => $tasks
             ], 200);
-        }else{
+        } else {
             return response()->json([
-            'status' => '404',
-            'message' => 'NULL '
-        ], 404);
+                'status' => '404',
+                'message' => 'NULL '
+            ], 404);
         }
-        
     }
 
     /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
-    {
-        //
-    }
-
-    /**
-     * Store a newly created resource in storage.
+     * @OA\Post(
+     *     path="/api/v1/tasks",
+     *     summary="Create a new task",
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="status", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=201, description="Task created successfully")
+     * )
      */
     public function store(StoreTaskRequest $request)
-{
-    $validatedData = $request->validated();
+    {
+        $validatedData = $request->validated();
 
-    $task = Task::create([
-        'name' => $validatedData['name'],
-        'description' => $validatedData['description'],
-        'status' => $validatedData['status'],
-    ]);
+        $task = Task::create([
+            'name' => $validatedData['name'],
+            'description' => $validatedData['description'],
+            'status' => $validatedData['status'],
+        ]);
 
-    return response()->json([
-        'message' => 'Task inserted successfully',
-    ], 201);
-}
+        return response()->json([
+            'message' => 'Task inserted successfully',
+        ], 201);
+    }
 
     /**
-     * Display the specified resource.
+     * @OA\Get(
+     *     path="/api/v1/tasks/{id}",
+     *     summary="Get a specific task by ID",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Successful operation"),
+     *     @OA\Response(response=404, description="Task not found")
+     * )
      */
     public function show(int $id)
     {
         $task = Task::find($id);
 
-        if($task){
+        if (!$task) {
             return response()->json([
+                'status' => 404,
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        $this->authorize('view', $task);
+
+        return response()->json([
             'status' => 200,
             'task' => $task,
         ], 200);
-        }else{
-            return response()->json([
-            'status' => 404,
-            'message' => 'Task not found',
-        ], 404);
-        }
-        // return response()->json($id);
     }
 
     /**
@@ -87,64 +106,99 @@ class TaskController extends Controller
     {
         $task = Task::find($id);
 
-        if($task){
+        if ($task) {
             return response()->json([
-            'status' => 200,
-            'task' => $task,
-        ], 200);
-        }else{
+                'status' => 200,
+                'task' => $task,
+            ], 200);
+        } else {
             return response()->json([
-            'status' => 404,
-            'message' => 'Task not found',
-        ], 404);
+                'status' => 404,
+                'message' => 'Task not found',
+            ], 404);
         }
     }
 
     /**
-     * Update the specified resource in storage.
+     * @OA\Put(
+     *     path="/api/v1/tasks/{id}",
+     *     summary="Update a specific task by ID",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\RequestBody(
+     *         required=true,
+     *         @OA\JsonContent(
+     *             @OA\Property(property="name", type="string"),
+     *             @OA\Property(property="description", type="string"),
+     *             @OA\Property(property="status", type="string")
+     *         )
+     *     ),
+     *     @OA\Response(response=200, description="Task updated successfully"),
+     *     @OA\Response(response=404, description="Task not found")
+     * )
      */
     public function update(UpdateTaskRequest $request, int $id)
-{
-    $validatedData = $request->validated();
+    {
+        $validatedData = $request->validated();
 
-    $task = Task::find($id);
+        $task = Task::find($id);
 
-    if (!$task) {
+        if (!$task) {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Task not found',
+            ], 404);
+        }
+
+        $this->authorize('update', $task);
+
+        $task->update([
+            'name' => $validatedData['name'],
+            'description' => $validatedData['description'],
+            'status' => $validatedData['status'],
+        ]);
+
         return response()->json([
-            'status' => 404,
-            'message' => 'Task not found',
-        ], 404);
+            'message' => 'Task updated successfully',
+        ], 200);
     }
 
-    $task->update([
-        'name' => $validatedData['name'],
-        'description' => $validatedData['description'],
-        'status' => $validatedData['status'],
-    ]);
-
-    return response()->json([
-        'message' => 'Task updated successfully',
-    ], 200);
-}
-
     /**
-     * Remove the specified resource from storage.
+     * @OA\Delete(
+     *     path="/api/v1/tasks/{id}",
+     *     summary="Delete a specific task by ID",
+     *     @OA\Parameter(
+     *         name="id",
+     *         in="path",
+     *         required=true,
+     *         @OA\Schema(type="integer")
+     *     ),
+     *     @OA\Response(response=200, description="Task deleted successfully"),
+     *     @OA\Response(response=404, description="Task not found")
+     * )
      */
     public function destroy(int $id)
     {
         $task = Task::find($id);
 
-        if($task){
+        if ($task) {
+            $this->authorize('delete', $task);
+
             $task->delete();
-             return response()->json([
-            'status' => 200,
-            'message' => 'Task deleted successfully',
-        ], 200);
-        }else{
-             return response()->json([
-            'status' => 404,
-            'message' => 'Task not found',
-        ], 404);
+
+            return response()->json([
+                'status' => 200,
+                'message' => 'Task deleted successfully',
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => 404,
+                'message' => 'Task not found',
+            ], 404);
         }
     }
 }
