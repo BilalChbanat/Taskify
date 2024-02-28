@@ -2,15 +2,27 @@
 
 namespace App\Http\Controllers\Api\V1;
 
+use App\Http\Resources\TaskResource;
 use App\Models\Task;
 use App\Http\Requests\StoreTaskRequest;
 use App\Http\Requests\UpdateTaskRequest;
 use App\Http\Controllers\Controller;
+use App\Repositories\TaskRepositoryInterface;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Validator;
 
 class TaskController extends Controller
 {
+
+
+    protected $taskRepository;
+
+    public function __construct(TaskRepositoryInterface $taskRepository)
+    {
+        $this->taskRepository = $taskRepository;
+    }
+
     /**
      * @OA\Get(
      *     path="/api/v1/tasks",
@@ -21,20 +33,26 @@ class TaskController extends Controller
      */
     public function index()
     {
-        $tasks = Task::all();
+        // Authorize the user to view tasks
+        $this->authorize('viewAny', Task::class);
+
+        // Get the authenticated user
+        $user = auth()->user();
+
+        // Retrieve tasks associated with the user using the repository
+        $tasks = $this->taskRepository->All(); // assuming getAll() is the correct method in your repository
 
         if (count($tasks) > 0) {
-            return response()->json([
-                'status' => '200',
-                'tasks' => $tasks
-            ], 200);
+            return TaskResource::collection($tasks); // Assuming TaskResource is the correct resource class
         } else {
             return response()->json([
                 'status' => '404',
-                'message' => 'NULL '
+                'message' => 'No tasks found for the user'
             ], 404);
         }
     }
+
+
 
     /**
      * @OA\Post(
@@ -51,20 +69,31 @@ class TaskController extends Controller
      *     @OA\Response(response=201, description="Task created successfully")
      * )
      */
-    public function store(StoreTaskRequest $request)
+    public function store(Request $request)
     {
-        $validatedData = $request->validated();
-
-        $task = Task::create([
-            'name' => $validatedData['name'],
-            'description' => $validatedData['description'],
-            'status' => $validatedData['status'],
+        // Validate the request data
+        $request->validate([
+            'name' => 'required',
+            'description' => 'required',
+            'status' => 'required',
         ]);
 
-        return response()->json([
-            'message' => 'Task inserted successfully',
-        ], 201);
+        // Create a new task
+        $task = new Task;
+        $task->name = $request->input('name');
+        $task->description = $request->input('description');
+        $task->status = $request->input('status');
+
+        // Assign the user_id based on the authenticated user
+        $task->user_id = Auth::id(); // Assuming you have user authentication
+
+        // Save the task to the database
+        $task->save();
+
+        // Optionally, you can return a response or redirect
+        return response()->json(['message' => 'Task created successfully', 'task' => $task], 201);
     }
+
 
     /**
      * @OA\Get(
@@ -82,7 +111,7 @@ class TaskController extends Controller
      */
     public function show(int $id)
     {
-        $task = Task::find($id);
+        $task = $this->taskRepository->find($id);
 
         if (!$task) {
             return response()->json([
@@ -90,8 +119,6 @@ class TaskController extends Controller
                 'message' => 'Task not found',
             ], 404);
         }
-
-        $this->authorize('view', $task);
 
         return response()->json([
             'status' => 200,
@@ -104,7 +131,7 @@ class TaskController extends Controller
      */
     public function edit(int $id)
     {
-        $task = Task::find($id);
+        $task = $this->taskRepository->find($id);
 
         if ($task) {
             return response()->json([
@@ -145,7 +172,7 @@ class TaskController extends Controller
     {
         $validatedData = $request->validated();
 
-        $task = Task::find($id);
+        $task = $this->taskRepository->find($id);
 
         if (!$task) {
             return response()->json([
@@ -156,11 +183,7 @@ class TaskController extends Controller
 
         $this->authorize('update', $task);
 
-        $task->update([
-            'name' => $validatedData['name'],
-            'description' => $validatedData['description'],
-            'status' => $validatedData['status'],
-        ]);
+        $this->taskRepository->update($id, $validatedData);
 
         return response()->json([
             'message' => 'Task updated successfully',
@@ -183,21 +206,46 @@ class TaskController extends Controller
      */
     public function destroy(int $id)
     {
-        $task = Task::find($id);
+        $task = $this->taskRepository->find($id);
 
-        if ($task) {
-            $this->authorize('delete', $task);
-
-            $task->delete();
-
-            return response()->json([
-                'status' => 200,
-                'message' => 'Task deleted successfully',
-            ], 200);
-        } else {
+        if (!$task) {
             return response()->json([
                 'status' => 404,
                 'message' => 'Task not found',
+            ], 404);
+        }
+
+        $this->authorize('delete', $task);
+
+        $this->taskRepository->delete($id);
+
+        return response()->json([
+            'status' => 200,
+            'message' => 'Task deleted successfully',
+        ], 200);
+    }
+
+    /**
+     * @OA\Get(
+     *     path="/api/v1/tasks/my-tasks",
+     *     summary="Get tasks owned by the authenticated user",
+     *     @OA\Response(response=200, description="Successful operation"),
+     *     @OA\Response(response=404, description="No tasks found")
+     * )
+     */
+    public function myTasks()
+    {
+        $tasks = $this->taskRepository->userTasks(auth()->id());
+
+        if (count($tasks) > 0) {
+            return response()->json([
+                'status' => '200',
+                'tasks' => $tasks
+            ], 200);
+        } else {
+            return response()->json([
+                'status' => '404',
+                'message' => 'No tasks found'
             ], 404);
         }
     }
