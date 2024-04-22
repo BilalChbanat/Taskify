@@ -11,9 +11,13 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::group(['prefix' => 'V1', 'namespace' => 'App\Http\Controllers\Api\V1', 'middleware' => ['auth:sanctum']], function () {
     Route::get('tasks', [TaskController::class, 'index']);
     Route::post('tasks', [TaskController::class, 'store']);
+});
+Route::group(['prefix' => 'V1', 'namespace' => 'App\Http\Controllers\Api\V1'], function () {
+    Route::post('tasks', [TaskController::class, 'store']);
+    Route::put('tasks/{id}', [TaskController::class, 'update']);
     Route::get('tasks/{id}', [TaskController::class, 'show']);
-    Route::put('tasks/{id}', [TaskController::class, 'update']); // Use 'put' instead of 'edit'
-    Route::delete('tasks/{id}', [TaskController::class, 'destroy']); // Use 'delete' instead of 'delete'
+    Route::delete('tasks/{id}', [TaskController::class, 'destroy']);
+
 });
 
 

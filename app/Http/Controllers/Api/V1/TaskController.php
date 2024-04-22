@@ -15,7 +15,6 @@ use Illuminate\Support\Facades\Validator;
 class TaskController extends Controller
 {
 
-
     protected $taskRepository;
 
     public function __construct(TaskRepositoryInterface $taskRepository)
@@ -35,12 +34,12 @@ class TaskController extends Controller
     {
         // Authorize the user to view tasks
         $this->authorize('viewAny', Task::class);
-
+        
         // Get the authenticated user
         $user = auth()->user();
 
-        // Retrieve tasks associated with the user using the repository
-        $tasks = $this->taskRepository->All(); // assuming getAll() is the correct method in your repository
+        // Retrieve tasks associated with the authenticated user using the repository
+        $tasks = $this->taskRepository->userTasks($user->id);
 
         if (count($tasks) > 0) {
             return TaskResource::collection($tasks); // Assuming TaskResource is the correct resource class
@@ -71,26 +70,22 @@ class TaskController extends Controller
      */
     public function store(Request $request)
     {
-        // Validate the request data
         $request->validate([
             'name' => 'required',
             'description' => 'required',
             'status' => 'required',
         ]);
 
-        // Create a new task
+        // $userId = Auth()->user()->id;
         $task = new Task;
         $task->name = $request->input('name');
         $task->description = $request->input('description');
         $task->status = $request->input('status');
+        $task->user_id = 11;
 
-        // Assign the user_id based on the authenticated user
-        $task->user_id = Auth::id(); // Assuming you have user authentication
 
-        // Save the task to the database
         $task->save();
 
-        // Optionally, you can return a response or redirect
         return response()->json(['message' => 'Task created successfully', 'task' => $task], 201);
     }
 
@@ -170,7 +165,8 @@ class TaskController extends Controller
      */
     public function update(UpdateTaskRequest $request, int $id)
     {
-        $validatedData = $request->validated();
+        
+         $validatedData = $request->validated();
 
         $task = $this->taskRepository->find($id);
 
@@ -181,7 +177,7 @@ class TaskController extends Controller
             ], 404);
         }
 
-        $this->authorize('update', $task);
+        // $this->authorize('update', $task);
 
         $this->taskRepository->update($id, $validatedData);
 
@@ -215,7 +211,6 @@ class TaskController extends Controller
             ], 404);
         }
 
-        $this->authorize('delete', $task);
 
         $this->taskRepository->delete($id);
 

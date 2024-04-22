@@ -10,4 +10,5 @@ interface TaskRepositoryInterface
     public function update(int $id, array $data);
     public function delete(int $id);
     public function userTasks(int $userId);
+    // public function findTaskByUserId($id, $userId);
 }
